@@ -1,0 +1,105 @@
+/*
+Title: Google Script Automatic Forwarder for JobActive
+Version: V0.2 Jan 2016
+Purpose: To automate the process shown in [How to Add SEEK or CareerOne Jobs to My Job Search Effort]( https://jobsearch.gov.au/documents/how%20to%20add%20seek%20job%20applications%20to%20my%20job%20search%20effort.pdf )
+Why?: You cannot automatically foward email to an external email account you do not own in gmail.
+Author: Mofosyne
+
+Installation Instruction for JobActive users: 
+1. Make sure that you have an email produced in https://jobsearch.gov.au/Jobseekers/PersonalDetails/RegistrationDetails . This is because JobSearchEffort@employment.gov.au will only accept emails that belongs to you.
+2.1. Setup your Gmail filter to append the label 'JobActive-UNSENT' from accepted job search website (As of 2016 Jan, this is only SEEK or CareerOne)
+2.2. Also create a label 'JobActive-SENT' to handle emails that has already been sent to JobActive
+3. Go to script.google.com and create a new empty script. 
+4. Copy this script over to the IDE window of script.google.com and edit the `var JSID = "YOUR JSID NUMBER HERE"` with your number;
+5. In the same scripting window, go to menu "Resources / Current Project's Triggers" and set the Trigger event to be time based every couple of minutes or less (or whatever you feel like).
+6. Now everytime you make an application on these job websites, your confirmation email will be automatically forwarded to JobActive with the required JobSeeker ID appended to the subject as required.
+
+Disable Script: 
+1. In script.google.com go to menu "Resources / All your triggers", and delete the trigger for jobActiveForwarder()
+
+Possible Extentions:
+* Have a seperate GUI interface or google app to make it easier for non technical users to install and use.
+* Install & Remove script/interface
+* Investigate if filters can be added or removed.
+
+Filter Settings in Gmail:
+    Matches: from:(no_reply@careerone.com.au) subject:(Confirmation of Submission)
+        Do this: Apply label "JobActive-UNSENT"
+    Matches: from:(service@seek.com.au) subject:(Job Application Confirmation)
+        Do this: Apply label "JobActive-UNSENT"
+
+Code was adapted from: http://stackoverflow.com/questions/10420435/trigger-google-apps-script-by-email
+
+*/
+
+
+//set a time-driven trigger to run this function on the desired frequency
+function jobActiveForwarder() {
+
+  // Configuration
+  var JSID = "YOU_ID_HERE";
+  var SendTo = "JobSearchEffort@employment.gov.au";
+
+  // Label Settings
+  var label = GmailApp.getUserLabelByName('JobActive-UNSENT'); // Labels to search for
+  var doneLabel = GmailApp.getUserLabelByName('JobActive-SENT'); // Labels to indicate when done
+
+  // Process emails
+  var cmds = label.getThreads(); // Find emails Thread with the desired label
+  var max = Math.min(cmds.length,5); // Total amount of found emails Threads/Convos
+  for( var i = 0; i < max; ++i ) { // For each found email conversation
+    var messagesList = cmds[i].getMessages();
+    var lastMessagePos = messagesList.length;
+    // Get last message
+    var messagePosFromZero = Math.max(lastMessagePos-1,0)
+    var email = cmds[i].getMessages()[messagePosFromZero];
+    var messageSubject = email.getSubject();
+    var messageBody = email.getBody();
+    //you may need to do extra parsing here, depending on your usage
+
+    var newsubject = "FW "+messageSubject +" - "+ JSID;
+
+    GmailApp.sendEmail(SendTo, newsubject, "",
+                                              {
+                                              htmlBody: messageBody
+                                              });
+
+    cmds[i].removeLabel(label).addLabel(doneLabel);
+  }
+}
+
+
+
+/* For your convenience, you can copy this to a file called 'gmailFilters.xml' and import it into https://mail.google.com/mail/u/0/#settings/filters
+
+<?xml version='1.0' encoding='UTF-8'?><feed xmlns='http://www.w3.org/2005/Atom' xmlns:apps='http://schemas.google.com/apps/2006'>
+    <title>Mail Filters</title>
+    <id>tag:mail.google.com,2008:filters:1456215252149,1456223701614</id>
+    <updated>2016-02-23T10:39:42Z</updated>
+    <entry>
+        <category term='filter'></category>
+        <title>Mail Filter</title>
+        <id>tag:mail.google.com,2008:filter:1456215252149</id>
+        <updated>2016-02-23T10:39:42Z</updated>
+        <content></content>
+        <apps:property name='from' value='no_reply@careerone.com.au'/>
+        <apps:property name='subject' value='Confirmation of Submission'/>
+        <apps:property name='label' value='JobActive-UNSENT'/>
+        <apps:property name='sizeOperator' value='s_sl'/>
+        <apps:property name='sizeUnit' value='s_smb'/>
+    </entry>
+    <entry>
+        <category term='filter'></category>
+        <title>Mail Filter</title>
+        <id>tag:mail.google.com,2008:filter:1456223701614</id>
+        <updated>2016-02-23T10:39:42Z</updated>
+        <content></content>
+        <apps:property name='from' value='service@seek.com.au'/>
+        <apps:property name='subject' value='Job Application Confirmation'/>
+        <apps:property name='label' value='JobActive-UNSENT'/>
+        <apps:property name='sizeOperator' value='s_sl'/>
+        <apps:property name='sizeUnit' value='s_smb'/>
+    </entry>
+</feed>
+
+*/
